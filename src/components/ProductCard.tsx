@@ -1,11 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, TrendingUp, TrendingDown, Package } from 'lucide-react';
 import { Product } from '../types';
-import { DynamicPricingEngine } from '../services/pricingEngine';
 
 interface ProductCardProps {
   product: Product;
@@ -14,49 +13,29 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onProductView }) => {
-  const [currentProduct, setCurrentProduct] = useState(product);
   const [priceChange, setPriceChange] = useState<'up' | 'down' | 'stable'>('stable');
-  const pricingEngine = DynamicPricingEngine.getInstance();
+  const previousPriceRef = useRef(product.currentPrice);
+  const [imageError, setImageError] = useState(false);
 
+  // Reset image error when product image URL changes
   useEffect(() => {
-    const interval = setInterval(() => {
-      const factors = {
-        stockLevel: currentProduct.stock,
-        demandLevel: pricingEngine.simulateDemand(currentProduct),
-        userBehavior: 0.5,
-        timeOfDay: new Date().getHours(),
-        seasonality: 1
-      };
+    setImageError(false);
+  }, [product.image]);
 
-      const newPrice = pricingEngine.calculateDynamicPrice(currentProduct, factors);
-      const oldPrice = currentProduct.currentPrice;
+  // Detect external price changes to show a short visual indicator
+  useEffect(() => {
+    const previousPrice = previousPriceRef.current;
+    if (Math.abs(product.currentPrice - previousPrice) > 0.01) {
+      setPriceChange(product.currentPrice > previousPrice ? 'up' : 'down');
+      previousPriceRef.current = product.currentPrice;
 
-      if (Math.abs(newPrice - oldPrice) > 0.01) {
-        setPriceChange(newPrice > oldPrice ? 'up' : 'down');
-        
-        setCurrentProduct(prev => ({
-          ...prev,
-          currentPrice: newPrice,
-          demand: factors.demandLevel,
-          priceHistory: [
-            ...prev.priceHistory,
-            {
-              timestamp: Date.now(),
-              price: newPrice,
-              reason: pricingEngine.getPriceChangeReason(oldPrice, newPrice, factors)
-            }
-          ]
-        }));
-
-        setTimeout(() => setPriceChange('stable'), 2000);
-      }
-    }, 10000 + Math.random() * 20000); // Random interval between 10-30 seconds
-
-    return () => clearInterval(interval);
-  }, [currentProduct, pricingEngine]);
+      const timeout = setTimeout(() => setPriceChange('stable'), 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [product.currentPrice]);
 
   const handleProductClick = () => {
-    onProductView(currentProduct);
+    onProductView(product);
   };
 
   const getStockStatus = (stock: number) => {
@@ -65,27 +44,37 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onProdu
     return { label: 'In Stock', color: 'secondary' as const };
   };
 
-  const stockStatus = getStockStatus(currentProduct.stock);
-  const priceIncrease = currentProduct.currentPrice > currentProduct.basePrice;
-  const priceDifference = Math.abs(currentProduct.currentPrice - currentProduct.basePrice);
+  const stockStatus = getStockStatus(product.stock);
+  const priceIncrease = product.currentPrice > product.basePrice;
+  const priceDifference = Math.abs(product.currentPrice - product.basePrice);
 
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
       <CardContent className="p-6" onClick={handleProductClick}>
-        <div className="aspect-square bg-gray-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
-          <Package className="w-16 h-16 text-gray-400" />
+        <div className="aspect-square bg-gray-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden group-hover:shadow-md transition-shadow">
+          {imageError || !product.image ? (
+            <Package className="w-16 h-16 text-gray-400" />
+          ) : (
+            <img
+              src={product.image}
+              alt={product.name}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+              onError={() => setImageError(true)}
+            />
+          )}
         </div>
         
         <div className="space-y-2">
           <h3 className="font-semibold text-lg group-hover:text-blue-600 transition-colors">
-            {currentProduct.name}
+            {product.name}
           </h3>
-          <p className="text-sm text-gray-600 line-clamp-2">{currentProduct.description}</p>
+          <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
           
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={stockStatus.color}>{stockStatus.label}</Badge>
-            <Badge variant="outline">{currentProduct.stock} left</Badge>
-            <Badge variant="secondary">{currentProduct.demand} views</Badge>
+            <Badge variant="outline">{product.stock} left</Badge>
+            <Badge variant="secondary">{product.demand} views</Badge>
           </div>
 
           <div className="flex items-center justify-between">
@@ -96,7 +85,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onProdu
                   priceChange === 'down' ? 'text-green-600' : 
                   'text-gray-900'
                 }`}>
-                  ${currentProduct.currentPrice.toFixed(2)}
+                  ${product.currentPrice.toFixed(2)}
                 </span>
                 {priceChange === 'up' && <TrendingUp className="w-4 h-4 text-red-500" />}
                 {priceChange === 'down' && <TrendingDown className="w-4 h-4 text-green-500" />}
@@ -120,13 +109,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onProdu
         <Button 
           onClick={(e) => {
             e.stopPropagation();
-            onAddToCart(currentProduct);
+            onAddToCart(product);
           }}
           className="w-full"
-          disabled={currentProduct.stock === 0}
+          disabled={product.stock === 0}
         >
           <ShoppingCart className="w-4 h-4 mr-2" />
-          {currentProduct.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
+          {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
         </Button>
       </CardFooter>
     </Card>

@@ -91,5 +91,95 @@ export const mockProducts: Product[] = [
       { timestamp: Date.now() - 86400000, price: 129.99, reason: 'Initial price' }
     ],
     tags: ['gaming', 'mechanical', 'rgb']
+  },
+  {
+    id: '7',
+    name: '4K Ultra HD Smart TV',
+    description: '55-inch 4K UHD Smart TV with HDR and built-in streaming apps',
+    basePrice: 599.99,
+    currentPrice: 599.99,
+    stock: 10,
+    category: 'Electronics',
+    image: '/placeholder.svg',
+    demand: 84,
+    priceHistory: [
+      { timestamp: Date.now() - 86400000, price: 599.99, reason: 'Initial price' }
+    ],
+    tags: ['tv', '4k', 'smart']
+  },
+  {
+    id: '8',
+    name: 'Noise-Canceling Earbuds',
+    description: 'Truly wireless earbuds with active noise cancellation and long battery life',
+    basePrice: 149.99,
+    currentPrice: 149.99,
+    stock: 30,
+    category: 'Electronics',
+    image: '/placeholder.svg',
+    demand: 58,
+    priceHistory: [
+      { timestamp: Date.now() - 86400000, price: 149.99, reason: 'Initial price' }
+    ],
+    tags: ['audio', 'wireless', 'earbuds']
+  },
+  {
+    id: '9',
+    name: 'Standing Desk Converter',
+    description: 'Adjustable standing desk converter for existing office desks',
+    basePrice: 229.99,
+    currentPrice: 229.99,
+    stock: 18,
+    category: 'Furniture',
+    image: '/placeholder.svg',
+    demand: 41,
+    priceHistory: [
+      { timestamp: Date.now() - 86400000, price: 229.99, reason: 'Initial price' }
+    ],
+    tags: ['office', 'health', 'desk']
+  },
+  {
+    id: '10',
+    name: 'Stainless Steel Cookware Set',
+    description: '10-piece stainless steel cookware set with glass lids',
+    basePrice: 159.99,
+    currentPrice: 159.99,
+    stock: 22,
+    category: 'Kitchen',
+    image: '/placeholder.svg',
+    demand: 63,
+    priceHistory: [
+      { timestamp: Date.now() - 86400000, price: 159.99, reason: 'Initial price' }
+    ],
+    tags: ['kitchen', 'cookware', 'home']
+  },
+  {
+    id: '11',
+    name: 'Yoga Mat with Alignment Lines',
+    description: 'Non-slip yoga mat with body alignment guides and carrying strap',
+    basePrice: 39.99,
+    currentPrice: 39.99,
+    stock: 40,
+    category: 'Fitness',
+    image: '/placeholder.svg',
+    demand: 52,
+    priceHistory: [
+      { timestamp: Date.now() - 86400000, price: 39.99, reason: 'Initial price' }
+    ],
+    tags: ['fitness', 'yoga', 'wellness']
+  },
+  {
+    id: '12',
+    name: 'RGB Gaming Mouse',
+    description: 'High-precision gaming mouse with customizable RGB lighting',
+    basePrice: 59.99,
+    currentPrice: 59.99,
+    stock: 35,
+    category: 'Gaming',
+    image: '/placeholder.svg',
+    demand: 74,
+    priceHistory: [
+      { timestamp: Date.now() - 86400000, price: 59.99, reason: 'Initial price' }
+    ],
+    tags: ['gaming', 'mouse', 'rgb']
   }
 ];

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,8 @@ import ProductCard from '../components/ProductCard';
 import ShoppingCart from '../components/ShoppingCart';
 import PricingDashboard from '../components/PricingDashboard';
 import { mockProducts } from '../data/mockProducts';
-import { Product, CartItem } from '../types';
+import { Product, CartItem, PricingFactors } from '../types';
+import { DynamicPricingEngine } from '../services/pricingEngine';
 
 const Index = () => {
   const [products, setProducts] = useState<Product[]>(mockProducts);
@@ -18,15 +19,26 @@ const Index = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const { toast } = useToast();
+  const pricingEngineRef = useRef(DynamicPricingEngine.getInstance());
 
-  const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))];
-  
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const categories = useMemo(
+    () => ['all', ...Array.from(new Set(products.map((p) => p.category)))],
+    [products]
+  );
+
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((product) => {
+        const lowerSearch = searchTerm.toLowerCase();
+        const matchesSearch =
+          product.name.toLowerCase().includes(lowerSearch) ||
+          product.description.toLowerCase().includes(lowerSearch);
+        const matchesCategory =
+          selectedCategory === 'all' || product.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      }),
+    [products, searchTerm, selectedCategory]
+  );
 
   const handleAddToCart = (product: Product) => {
     setCartItems(prev => {
@@ -51,9 +63,11 @@ const Index = () => {
     });
 
     // Simulate stock reduction
-    setProducts(prev => prev.map(p =>
-      p.id === product.id ? { ...p, stock: Math.max(0, p.stock - 1) } : p
-    ));
+    setProducts(prev =>
+      prev.map(p =>
+        p.id === product.id ? { ...p, stock: Math.max(0, p.stock - 1) } : p
+      )
+    );
 
     toast({
       title: "Added to cart",
@@ -94,9 +108,11 @@ const Index = () => {
 
   const handleProductView = (product: Product) => {
     // Simulate user interaction for pricing algorithm
-    setProducts(prev => prev.map(p =>
-      p.id === product.id ? { ...p, demand: p.demand + 1 } : p
-    ));
+    setProducts(prev =>
+      prev.map(p =>
+        p.id === product.id ? { ...p, demand: p.demand + 1 } : p
+      )
+    );
   };
 
   const handleCheckout = () => {
@@ -107,11 +123,44 @@ const Index = () => {
     // In a real app, this would integrate with a payment processor
   };
 
-  // Update products state when pricing changes occur
+  // Centralized dynamic pricing loop to keep products and analytics in sync
   useEffect(() => {
+    const engine = pricingEngineRef.current;
+
     const interval = setInterval(() => {
-      setProducts(prev => [...prev]); // Trigger re-render for price updates
-    }, 1000);
+      setProducts(prevProducts =>
+        prevProducts.map(product => {
+          const factors: PricingFactors = {
+            stockLevel: product.stock,
+            demandLevel: engine.simulateDemand(product),
+            userBehavior: 0.5,
+            timeOfDay: new Date().getHours(),
+            seasonality: 1,
+          };
+
+          const oldPrice = product.currentPrice;
+          const newPrice = engine.calculateDynamicPrice(product, factors);
+
+          if (Math.abs(newPrice - oldPrice) <= 0.01) {
+            return product;
+          }
+
+          return {
+            ...product,
+            currentPrice: newPrice,
+            demand: factors.demandLevel,
+            priceHistory: [
+              ...product.priceHistory,
+              {
+                timestamp: Date.now(),
+                price: newPrice,
+                reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
+              },
+            ],
+          };
+        })
+      );
+    }, 12000);
 
     return () => clearInterval(interval);
   }, []);
