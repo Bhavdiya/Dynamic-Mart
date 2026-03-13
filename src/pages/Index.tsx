@@ -116,11 +116,23 @@ const Index = () => {
   };
 
   const handleCheckout = () => {
+    if (cartItems.length === 0) {
+      toast({
+        title: "Cart is empty",
+        description: "Add some products to your cart before checking out.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Clear the cart to simulate a completed checkout
+    setCartItems([]);
+
     toast({
-      title: "Checkout initiated",
-      description: "Redirecting to payment gateway...",
+      title: "Checkout successful",
+      description: "Your order has been placed successfully.",
     });
-    // In a real app, this would integrate with a payment processor
+    // In a real app, this is where payment integration would happen
   };
 
   // Centralized dynamic pricing loop to keep products and analytics in sync

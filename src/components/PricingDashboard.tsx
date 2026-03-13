@@ -16,8 +16,10 @@ const PricingDashboard: React.FC<PricingDashboardProps> = ({ products }) => {
     return sum + increase;
   }, 0) / totalProducts;
 
-  const lowStockProducts = products.filter(p => p.stock <= 10).length;
-  const highDemandProducts = products.filter(p => p.demand > 60).length;
+  const lowStockList = products.filter(p => p.stock <= 10);
+  const highDemandList = products.filter(p => p.demand > 60);
+  const lowStockProducts = lowStockList.length;
+  const highDemandProducts = highDemandList.length;
   const totalViews = products.reduce((sum, p) => sum + p.demand, 0);
 
   const recentPriceChanges = products
@@ -97,36 +99,79 @@ const PricingDashboard: React.FC<PricingDashboardProps> = ({ products }) => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Price Changes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentPriceChanges.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No recent price changes</p>
-            ) : (
-              recentPriceChanges.map((change, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-sm">{change.product.name}</h4>
-                    <p className="text-xs text-gray-600">{change.reason}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Price Changes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recentPriceChanges.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No recent price changes</p>
+              ) : (
+                recentPriceChanges.map((change, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">{change.product.name}</h4>
+                      <p className="text-xs text-gray-600">{change.reason}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={change.change >= 0 ? "destructive" : "secondary"}>
+                        {change.change >= 0 ? '+' : ''}${change.change.toFixed(2)}
+                      </Badge>
+                      {change.change >= 0 ? 
+                        <TrendingUp className="w-4 h-4 text-red-500" /> : 
+                        <TrendingDown className="w-4 h-4 text-green-500" />
+                      }
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={change.change >= 0 ? "destructive" : "secondary"}>
-                      {change.change >= 0 ? '+' : ''}${change.change.toFixed(2)}
-                    </Badge>
-                    {change.change >= 0 ? 
-                      <TrendingUp className="w-4 h-4 text-red-500" /> : 
-                      <TrendingDown className="w-4 h-4 text-green-500" />
-                    }
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Low Stock & High Demand Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <h4 className="font-semibold mb-2">Low Stock</h4>
+                {lowStockList.length === 0 ? (
+                  <p className="text-gray-500 text-xs">No low stock items</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {lowStockList.map((p) => (
+                      <li key={p.id} className="flex justify-between">
+                        <span className="truncate pr-2">{p.name}</span>
+                        <span className="text-xs text-gray-600">{p.stock} left</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">High Demand</h4>
+                {highDemandList.length === 0 ? (
+                  <p className="text-gray-500 text-xs">No high demand items</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {highDemandList.map((p) => (
+                      <li key={p.id} className="flex justify-between">
+                        <span className="truncate pr-2">{p.name}</span>
+                        <span className="text-xs text-gray-600">{p.demand} views</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
