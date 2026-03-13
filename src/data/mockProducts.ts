@@ -10,7 +10,7 @@ export const mockProducts: Product[] = [
     currentPrice: 299.99,
     stock: 15,
     category: 'Electronics',
-    image: '/placeholder.svg',
+    image: '/images/headphones.jpg',
     demand: 45,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 299.99, reason: 'Initial price' }
@@ -25,7 +25,7 @@ export const mockProducts: Product[] = [
     currentPrice: 199.99,
     stock: 8,
     category: 'Fitness',
-    image: '/placeholder.svg',
+    image: '/images/fitness-watch.jpg',
     demand: 78,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 199.99, reason: 'Initial price' }
@@ -40,7 +40,7 @@ export const mockProducts: Product[] = [
     currentPrice: 449.99,
     stock: 25,
     category: 'Furniture',
-    image: '/placeholder.svg',
+    image: '/images/office-chair.jpg',
     demand: 32,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 449.99, reason: 'Initial price' }
@@ -55,7 +55,7 @@ export const mockProducts: Product[] = [
     currentPrice: 79.99,
     stock: 3,
     category: 'Electronics',
-    image: '/placeholder.svg',
+    image: '/images/bluetooth-speaker.jpg',
     demand: 92,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 79.99, reason: 'Initial price' }
@@ -70,7 +70,7 @@ export const mockProducts: Product[] = [
     currentPrice: 189.99,
     stock: 12,
     category: 'Kitchen',
-    image: '/placeholder.svg',
+    image: '/images/coffee-maker.jpg',
     demand: 56,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 189.99, reason: 'Initial price' }
@@ -85,7 +85,7 @@ export const mockProducts: Product[] = [
     currentPrice: 129.99,
     stock: 20,
     category: 'Gaming',
-    image: '/placeholder.svg',
+    image: '/images/gaming-keyboard.jpg',
     demand: 67,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 129.99, reason: 'Initial price' }
@@ -100,7 +100,7 @@ export const mockProducts: Product[] = [
     currentPrice: 599.99,
     stock: 10,
     category: 'Electronics',
-    image: '/placeholder.svg',
+    image: '/images/4K-tv.jpg',
     demand: 84,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 599.99, reason: 'Initial price' }
@@ -115,7 +115,7 @@ export const mockProducts: Product[] = [
     currentPrice: 149.99,
     stock: 30,
     category: 'Electronics',
-    image: '/placeholder.svg',
+    image: '/images/earbuds.jpg',
     demand: 58,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 149.99, reason: 'Initial price' }
@@ -130,7 +130,7 @@ export const mockProducts: Product[] = [
     currentPrice: 229.99,
     stock: 18,
     category: 'Furniture',
-    image: '/placeholder.svg',
+    image: '/images/standing-desk-converter.jpg',
     demand: 41,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 229.99, reason: 'Initial price' }
@@ -145,7 +145,7 @@ export const mockProducts: Product[] = [
     currentPrice: 159.99,
     stock: 22,
     category: 'Kitchen',
-    image: '/placeholder.svg',
+    image: '/images/cookware-set.jpg',
     demand: 63,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 159.99, reason: 'Initial price' }
@@ -160,7 +160,7 @@ export const mockProducts: Product[] = [
     currentPrice: 39.99,
     stock: 40,
     category: 'Fitness',
-    image: '/placeholder.svg',
+    image: '/images/yoga-mat.jpg',
     demand: 52,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 39.99, reason: 'Initial price' }
@@ -175,7 +175,7 @@ export const mockProducts: Product[] = [
     currentPrice: 59.99,
     stock: 35,
     category: 'Gaming',
-    image: '/placeholder.svg',
+    image: '/images/gaming-mouse.jpg',
     demand: 74,
     priceHistory: [
       { timestamp: Date.now() - 86400000, price: 59.99, reason: 'Initial price' }
