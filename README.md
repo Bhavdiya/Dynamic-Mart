@@ -1,4 +1,4 @@
-# price-pilot-commerce
+# Dynamic-Mart
 
 ## Project info
 

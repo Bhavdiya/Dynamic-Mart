@@ -62,11 +62,49 @@ const Index = () => {
       }
     });
 
-    // Simulate stock reduction
+    // Simulate stock reduction and a price adjustment driven by increased demand
+    const engine = pricingEngineRef.current;
     setProducts(prev =>
-      prev.map(p =>
-        p.id === product.id ? { ...p, stock: Math.max(0, p.stock - 1) } : p
-      )
+      prev.map(p => {
+        if (p.id !== product.id) return p;
+
+        const updatedStock = Math.max(0, p.stock - 1);
+        const factors: PricingFactors = {
+          stockLevel: updatedStock,
+          demandLevel: engine.simulateDemand(p),
+          userBehavior: 0.8, // higher intent when user adds to cart
+          timeOfDay: new Date().getHours(),
+          seasonality: 1,
+        };
+
+        const oldPrice = p.currentPrice;
+        const enginePrice = engine.calculateDynamicPrice(p, factors);
+        // Ensure price moves upward with each add-to-cart
+        const targetPrice = Math.max(oldPrice * 1.02, enginePrice);
+        const newPrice = Math.round(targetPrice * 100) / 100;
+
+        if (Math.abs(newPrice - oldPrice) <= 0.01) {
+          return {
+            ...p,
+            stock: updatedStock,
+          };
+        }
+
+        return {
+          ...p,
+          stock: updatedStock,
+          currentPrice: newPrice,
+          demand: factors.demandLevel,
+          priceHistory: [
+            ...p.priceHistory,
+            {
+              timestamp: Date.now(),
+              price: newPrice,
+              reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
+            },
+          ],
+        };
+      })
     );
 
     toast({
@@ -125,6 +163,48 @@ const Index = () => {
       return;
     }
 
+    const engine = pricingEngineRef.current;
+
+    // Adjust pricing for items that were just purchased
+    setProducts(prevProducts =>
+      prevProducts.map(product => {
+        const cartItem = cartItems.find(item => item.product.id === product.id);
+        if (!cartItem) return product;
+
+        const factors: PricingFactors = {
+          stockLevel: product.stock,
+          demandLevel: engine.simulateDemand(product),
+          userBehavior: 0.9, // very high intent: user completed checkout
+          timeOfDay: new Date().getHours(),
+          seasonality: 1,
+        };
+
+        const oldPrice = product.currentPrice;
+        const enginePrice = engine.calculateDynamicPrice(product, factors);
+        // Stronger upward adjustment on completed checkout
+        const targetPrice = Math.max(oldPrice * 1.05, enginePrice);
+        const newPrice = Math.round(targetPrice * 100) / 100;
+
+        if (Math.abs(newPrice - oldPrice) <= 0.01) {
+          return product;
+        }
+
+        return {
+          ...product,
+          currentPrice: newPrice,
+          demand: factors.demandLevel,
+          priceHistory: [
+            ...product.priceHistory,
+            {
+              timestamp: Date.now(),
+              price: newPrice,
+              reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
+            },
+          ],
+        };
+      })
+    );
+
     // Clear the cart to simulate a completed checkout
     setCartItems([]);
 
@@ -135,47 +215,7 @@ const Index = () => {
     // In a real app, this is where payment integration would happen
   };
 
-  // Centralized dynamic pricing loop to keep products and analytics in sync
-  useEffect(() => {
-    const engine = pricingEngineRef.current;
-
-    const interval = setInterval(() => {
-      setProducts(prevProducts =>
-        prevProducts.map(product => {
-          const factors: PricingFactors = {
-            stockLevel: product.stock,
-            demandLevel: engine.simulateDemand(product),
-            userBehavior: 0.5,
-            timeOfDay: new Date().getHours(),
-            seasonality: 1,
-          };
-
-          const oldPrice = product.currentPrice;
-          const newPrice = engine.calculateDynamicPrice(product, factors);
-
-          if (Math.abs(newPrice - oldPrice) <= 0.01) {
-            return product;
-          }
-
-          return {
-            ...product,
-            currentPrice: newPrice,
-            demand: factors.demandLevel,
-            priceHistory: [
-              ...product.priceHistory,
-              {
-                timestamp: Date.now(),
-                price: newPrice,
-                reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
-              },
-            ],
-          };
-        })
-      );
-    }, 12000);
-
-    return () => clearInterval(interval);
-  }, []);
+  // Pricing is now updated only on user actions like add-to-cart and checkout
 
   return (
     <div className="min-h-screen bg-gray-50">
