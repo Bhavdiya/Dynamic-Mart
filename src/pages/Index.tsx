@@ -13,7 +13,7 @@ import { mockProducts } from '../data/mockProducts';
 import { Product, CartItem, PricingFactors, StockEvent } from '../types';
 import { DynamicPricingEngine } from '../services/pricingEngine';
 
-// How often (ms) the background stock simulation runs
+// How often (ms) the background stock simulation runs.
 const STOCK_SIMULATION_INTERVAL_MS = 20_000;
 
 const Index = () => {
