@@ -8,15 +8,25 @@ export interface Product {
   stock: number;
   category: string;
   image: string;
+  /** Demand score 0–100: higher = more popular */
   demand: number;
   priceHistory: PricePoint[];
+  stockHistory: StockEvent[];
   tags: string[];
+  lastRestocked?: number; // timestamp of last restock
 }
 
 export interface PricePoint {
   timestamp: number;
   price: number;
   reason: string;
+}
+
+export interface StockEvent {
+  timestamp: number;
+  delta: number;        // positive = restock, negative = sold/consumed
+  stockAfter: number;
+  trigger: 'restock' | 'purchase' | 'simulation' | 'manual';
 }
 
 export interface CartItem {

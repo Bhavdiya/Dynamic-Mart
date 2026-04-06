@@ -1,17 +1,20 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, Store } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ProductCard from '../components/ProductCard';
 import ShoppingCart from '../components/ShoppingCart';
 import PricingDashboard from '../components/PricingDashboard';
 import { mockProducts } from '../data/mockProducts';
-import { Product, CartItem, PricingFactors } from '../types';
+import { Product, CartItem, PricingFactors, StockEvent } from '../types';
 import { DynamicPricingEngine } from '../services/pricingEngine';
+
+// How often (ms) the background stock simulation runs
+const STOCK_SIMULATION_INTERVAL_MS = 20_000;
 
 const Index = () => {
   const [products, setProducts] = useState<Product[]>(mockProducts);
@@ -40,18 +43,89 @@ const Index = () => {
     [products, searchTerm, selectedCategory]
   );
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Background stock simulation — runs every STOCK_SIMULATION_INTERVAL_MS
+  // ─────────────────────────────────────────────────────────────────────────
+  const runStockSimulation = useCallback(() => {
+    const engine = pricingEngineRef.current;
+
+    setProducts(prev =>
+      prev.map(p => {
+        const delta = engine.simulateStockFluctuation(p);
+        if (delta === 0) return p;
+
+        const newStock = Math.max(0, p.stock + delta);
+        const trigger: StockEvent['trigger'] = delta > 0 ? 'restock' : 'simulation';
+
+        const newStockEvent: StockEvent = {
+          timestamp: Date.now(),
+          delta,
+          stockAfter: newStock,
+          trigger,
+        };
+
+        // Re-calculate price given the new stock level
+        const newDemand = engine.simulateDemand({ ...p, stock: newStock });
+        const factors: PricingFactors = {
+          stockLevel: newStock,
+          demandLevel: newDemand,
+          userBehavior: 0.5,
+          timeOfDay: new Date().getHours(),
+          seasonality: 1,
+        };
+
+        const oldPrice = p.currentPrice;
+        const newPrice = engine.calculateDynamicPrice({ ...p, stock: newStock }, factors);
+        const pricedChanged = Math.abs(newPrice - oldPrice) > 0.01;
+
+        return {
+          ...p,
+          stock: newStock,
+          demand: newDemand,
+          currentPrice: pricedChanged ? newPrice : oldPrice,
+          lastRestocked: delta > 0 ? Date.now() : p.lastRestocked,
+          stockHistory: [...p.stockHistory, newStockEvent],
+          priceHistory: pricedChanged
+            ? [
+                ...p.priceHistory,
+                {
+                  timestamp: Date.now(),
+                  price: newPrice,
+                  reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
+                },
+              ]
+            : p.priceHistory,
+        };
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(runStockSimulation, STOCK_SIMULATION_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [runStockSimulation]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cart operations
+  // ─────────────────────────────────────────────────────────────────────────
   const handleAddToCart = (product: Product) => {
+    const engine = pricingEngineRef.current;
+
     setCartItems(prev => {
       const existingItem = prev.find(item => item.product.id === product.id);
+      const currentQtyInCart = existingItem?.quantity ?? 0;
+
+      // Check against remaining available stock
+      if (currentQtyInCart >= product.stock) {
+        toast({
+          title: 'Stock limit reached',
+          description: `Only ${product.stock} unit${product.stock !== 1 ? 's' : ''} available`,
+          variant: 'destructive',
+        });
+        return prev;
+      }
+
       if (existingItem) {
-        if (existingItem.quantity >= product.stock) {
-          toast({
-            title: "Stock limit reached",
-            description: `Only ${product.stock} items available`,
-            variant: "destructive"
-          });
-          return prev;
-        }
         return prev.map(item =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
@@ -62,8 +136,7 @@ const Index = () => {
       }
     });
 
-    // Simulate stock reduction and a price adjustment driven by increased demand
-    const engine = pricingEngineRef.current;
+    // Reduce stock and recalculate price
     setProducts(prev =>
       prev.map(p => {
         if (p.id !== product.id) return p;
@@ -71,45 +144,49 @@ const Index = () => {
         const updatedStock = Math.max(0, p.stock - 1);
         const factors: PricingFactors = {
           stockLevel: updatedStock,
-          demandLevel: engine.simulateDemand(p),
-          userBehavior: 0.8, // higher intent when user adds to cart
+          demandLevel: engine.simulateDemand({ ...p, stock: updatedStock }),
+          userBehavior: 0.85, // high intent — user adding to cart
           timeOfDay: new Date().getHours(),
           seasonality: 1,
         };
 
         const oldPrice = p.currentPrice;
-        const enginePrice = engine.calculateDynamicPrice(p, factors);
-        // Ensure price moves upward with each add-to-cart
-        const targetPrice = Math.max(oldPrice * 1.02, enginePrice);
+        const enginePrice = engine.calculateDynamicPrice({ ...p, stock: updatedStock }, factors);
+        // Ensure price reflects scarcity — nudge upward at least 1%
+        const targetPrice = Math.max(oldPrice * 1.01, enginePrice);
         const newPrice = Math.round(targetPrice * 100) / 100;
+        const priceChanged = Math.abs(newPrice - oldPrice) > 0.01;
 
-        if (Math.abs(newPrice - oldPrice) <= 0.01) {
-          return {
-            ...p,
-            stock: updatedStock,
-          };
-        }
+        const stockEvent: StockEvent = {
+          timestamp: Date.now(),
+          delta: -1,
+          stockAfter: updatedStock,
+          trigger: 'purchase',
+        };
 
         return {
           ...p,
           stock: updatedStock,
-          currentPrice: newPrice,
           demand: factors.demandLevel,
-          priceHistory: [
-            ...p.priceHistory,
-            {
-              timestamp: Date.now(),
-              price: newPrice,
-              reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
-            },
-          ],
+          currentPrice: priceChanged ? newPrice : oldPrice,
+          stockHistory: [...p.stockHistory, stockEvent],
+          priceHistory: priceChanged
+            ? [
+                ...p.priceHistory,
+                {
+                  timestamp: Date.now(),
+                  price: newPrice,
+                  reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
+                },
+              ]
+            : p.priceHistory,
         };
       })
     );
 
     toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart`,
+      title: 'Added to cart',
+      description: `${product.name} added. Price may fluctuate with demand.`,
     });
   };
 
@@ -119,36 +196,84 @@ const Index = () => {
       return;
     }
 
+    const item = cartItems.find(i => i.product.id === productId);
+    if (!item) return;
+
+    // Validate against available stock
+    const productInState = products.find(p => p.id === productId);
+    if (productInState && quantity > productInState.stock + item.quantity) {
+      toast({
+        title: 'Insufficient stock',
+        description: `Only ${productInState.stock + item.quantity} units available`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const quantityDelta = quantity - item.quantity; // + means adding more, - means returning
+
+    // Adjust stock accordingly
+    setProducts(prev =>
+      prev.map(p => {
+        if (p.id !== productId) return p;
+        const newStock = Math.max(0, p.stock - quantityDelta);
+
+        const stockEvent: StockEvent = {
+          timestamp: Date.now(),
+          delta: -quantityDelta,
+          stockAfter: newStock,
+          trigger: 'purchase',
+        };
+
+        return {
+          ...p,
+          stock: newStock,
+          stockHistory: [...p.stockHistory, stockEvent],
+        };
+      })
+    );
+
     setCartItems(prev =>
-      prev.map(item =>
-        item.product.id === productId
-          ? { ...item, quantity }
-          : item
+      prev.map(i =>
+        i.product.id === productId ? { ...i, quantity } : i
       )
     );
   };
 
   const handleRemoveItem = (productId: string) => {
-    const item = cartItems.find(item => item.product.id === productId);
+    const item = cartItems.find(i => i.product.id === productId);
     if (item) {
-      // Restore stock
-      setProducts(prev => prev.map(p =>
-        p.id === productId ? { ...p, stock: p.stock + item.quantity } : p
-      ));
+      // Restore stock when item is removed from cart
+      setProducts(prev =>
+        prev.map(p => {
+          if (p.id !== productId) return p;
+          const restoredStock = p.stock + item.quantity;
+          const stockEvent: StockEvent = {
+            timestamp: Date.now(),
+            delta: item.quantity,
+            stockAfter: restoredStock,
+            trigger: 'manual',
+          };
+          return {
+            ...p,
+            stock: restoredStock,
+            stockHistory: [...p.stockHistory, stockEvent],
+          };
+        })
+      );
     }
 
-    setCartItems(prev => prev.filter(item => item.product.id !== productId));
-    toast({
-      title: "Item removed",
-      description: "Item has been removed from your cart",
-    });
+    setCartItems(prev => prev.filter(i => i.product.id !== productId));
+    toast({ title: 'Item removed', description: 'Item removed from your cart.' });
   };
 
   const handleProductView = (product: Product) => {
-    // Simulate user interaction for pricing algorithm
+    // Increment demand score when a user interacts with the product card
     setProducts(prev =>
       prev.map(p =>
-        p.id === product.id ? { ...p, demand: p.demand + 1 } : p
+        p.id === product.id
+          ? { ...p, demand: Math.min(100, p.demand + 1) }
+          : p
       )
     );
   };
@@ -156,16 +281,16 @@ const Index = () => {
   const handleCheckout = () => {
     if (cartItems.length === 0) {
       toast({
-        title: "Cart is empty",
-        description: "Add some products to your cart before checking out.",
-        variant: "destructive",
+        title: 'Cart is empty',
+        description: 'Add products before checking out.',
+        variant: 'destructive',
       });
       return;
     }
 
     const engine = pricingEngineRef.current;
 
-    // Adjust pricing for items that were just purchased
+    // Reflect higher demand after a confirmed purchase
     setProducts(prevProducts =>
       prevProducts.map(product => {
         const cartItem = cartItems.find(item => item.product.id === product.id);
@@ -174,56 +299,53 @@ const Index = () => {
         const factors: PricingFactors = {
           stockLevel: product.stock,
           demandLevel: engine.simulateDemand(product),
-          userBehavior: 0.9, // very high intent: user completed checkout
+          userBehavior: 0.95, // highest intent — completed checkout
           timeOfDay: new Date().getHours(),
           seasonality: 1,
         };
 
         const oldPrice = product.currentPrice;
         const enginePrice = engine.calculateDynamicPrice(product, factors);
-        // Stronger upward adjustment on completed checkout
-        const targetPrice = Math.max(oldPrice * 1.05, enginePrice);
+        // Stronger upward adjustment post-purchase — at least 2% bump
+        const targetPrice = Math.max(oldPrice * 1.02, enginePrice);
         const newPrice = Math.round(targetPrice * 100) / 100;
-
-        if (Math.abs(newPrice - oldPrice) <= 0.01) {
-          return product;
-        }
+        const priceChanged = Math.abs(newPrice - oldPrice) > 0.01;
 
         return {
           ...product,
-          currentPrice: newPrice,
+          currentPrice: priceChanged ? newPrice : oldPrice,
           demand: factors.demandLevel,
-          priceHistory: [
-            ...product.priceHistory,
-            {
-              timestamp: Date.now(),
-              price: newPrice,
-              reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
-            },
-          ],
+          priceHistory: priceChanged
+            ? [
+                ...product.priceHistory,
+                {
+                  timestamp: Date.now(),
+                  price: newPrice,
+                  reason: engine.getPriceChangeReason(oldPrice, newPrice, factors),
+                },
+              ]
+            : product.priceHistory,
         };
       })
     );
 
-    // Clear the cart to simulate a completed checkout
     setCartItems([]);
-
     toast({
-      title: "Checkout successful",
-      description: "Your order has been placed successfully.",
+      title: '✅ Checkout successful',
+      description: 'Your order has been placed. Prices adjusted based on new demand.',
     });
-    // In a real app, this is where payment integration would happen
   };
-
-  // Pricing is now updated only on user actions like add-to-cart and checkout
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-40">
+      <header className="bg-white border-b sticky top-0 z-40 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <h1 className="text-2xl font-bold text-gray-900">DynamicMart</h1>
+              <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+                Live Pricing
+              </Badge>
             </div>
             <div className="flex items-center space-x-4">
               <ShoppingCart
@@ -259,7 +381,7 @@ const Index = () => {
                 {categories.map(category => (
                   <Button
                     key={category}
-                    variant={selectedCategory === category ? "default" : "outline"}
+                    variant={selectedCategory === category ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedCategory(category)}
                   >
