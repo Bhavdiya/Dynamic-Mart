@@ -12,6 +12,18 @@ import {
   RefreshCcw,
   Layers,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from 'recharts';
 import { Product } from '../types';
 import { DynamicPricingEngine } from '../services/pricingEngine';
 
@@ -455,7 +467,137 @@ const PricingDashboard: React.FC<PricingDashboardProps> = ({ products }) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Base Price vs Current Price Bar Chart ───────────────────────── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-violet-500" />
+              Base Price vs. Current Price — All Products
+            </CardTitle>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm bg-slate-400" />
+                Base Price
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm bg-violet-500" />
+                Current Price (higher)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />
+                Current Price (lower)
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <PriceComparisonChart products={products} />
+        </CardContent>
+      </Card>
     </div>
+  );
+};
+
+// ── Price Comparison Chart (extracted for clarity) ───────────────────────────
+interface TooltipPayload {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
+
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+  const base = payload.find(p => p.name === 'Base Price');
+  const current = payload.find(p => p.name === 'Current Price');
+  if (!base || !current) return null;
+  const delta = current.value - base.value;
+  const deltaPct = (delta / base.value) * 100;
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs min-w-[180px]">
+      <p className="font-semibold text-gray-800 mb-2 text-sm">{label}</p>
+      <div className="space-y-1">
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-500">Base Price</span>
+          <span className="font-medium text-gray-700">{fmt(base.value)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-500">Current Price</span>
+          <span className={`font-semibold ${delta > 0 ? 'text-orange-600' : delta < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+            {fmt(current.value)}
+          </span>
+        </div>
+        <div className="border-t pt-1 mt-1 flex justify-between gap-4">
+          <span className="text-gray-500">Change</span>
+          <span className={`font-bold ${delta > 0 ? 'text-orange-600' : delta < 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
+            {delta > 0 ? '+' : ''}{fmt(delta)} ({delta >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%)
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PriceComparisonChart: React.FC<{ products: Product[] }> = ({ products }) => {
+  const chartData = useMemo(() =>
+    products.map(p => ({
+      name: p.name.length > 14 ? p.name.slice(0, 13) + '…' : p.name,
+      fullName: p.name,
+      basePrice: p.basePrice,
+      currentPrice: p.currentPrice,
+      isHigher: p.currentPrice > p.basePrice,
+    })),
+    [products]
+  );
+
+  return (
+    <ResponsiveContainer width="100%" height={340}>
+      <BarChart
+        data={chartData}
+        margin={{ top: 10, right: 20, left: 10, bottom: 60 }}
+        barCategoryGap="28%"
+        barGap={4}
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: 11, fill: '#6b7280' }}
+          tickLine={false}
+          axisLine={{ stroke: '#e5e7eb' }}
+          angle={-35}
+          textAnchor="end"
+          interval={0}
+          height={60}
+        />
+        <YAxis
+          tickFormatter={(v) => `$${v}`}
+          tick={{ fontSize: 11, fill: '#6b7280' }}
+          tickLine={false}
+          axisLine={false}
+          width={60}
+        />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(139,92,246,0.05)' }} />
+        <Legend
+          wrapperStyle={{ display: 'none' }}
+        />
+        <Bar dataKey="basePrice" name="Base Price" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={32} />
+        <Bar dataKey="currentPrice" name="Current Price" radius={[4, 4, 0, 0]} maxBarSize={32}>
+          {chartData.map((entry, index) => (
+            <Cell
+              key={`cell-${index}`}
+              fill={entry.isHigher ? '#8b5cf6' : entry.currentPrice < entry.basePrice ? '#10b981' : '#94a3b8'}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
   );
 };
 
